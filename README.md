@@ -1,4 +1,4 @@
-# Shinkansen Passenger Satisfaction - Rank 1 Solution
+# Shinkansen Passenger Satisfaction - Rank 1 Solution (Score: 0.9589)
 
 [cite_start]This repository contains the top-performing architecture for the Shinkansen Passenger Satisfaction Hackathon, held from February 6th - February 8th, 2026[cite: 6]. [cite_start]The provided solution secured the first position [cite: 5] [cite_start]by Rastin Aghighi[cite: 4].
 
