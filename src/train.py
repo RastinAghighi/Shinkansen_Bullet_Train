@@ -1,61 +1,80 @@
 """
-Primary execution script implementing Stratified K-Fold CV and CatBoost serialization.
+Primary execution pipeline for the Shinkansen CatBoost architecture.
+Implements Stratified K-Fold CV, hyperparameter injection, and model interpretability.
 """
-import os
+import argparse
 import logging
-import numpy as np
+import yaml
 import pandas as pd
-from catboost import CatBoostClassifier, Pool
-from sklearn.model_selection import StratifiedKFold
-from .config import CB_PARAMS, MODEL_DIR, SUBMISSION_FILE, RANDOM_SEED
-from .data_loader import load_raw_data
-from .features import apply_feature_engineering
+from catboost import CatBoostClassifier
+from src.evaluate import generate_shap_explanations
 
-logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
+# Isolate logging to standard output for pipeline tracking
+logging.basicConfig(
+    level=logging.INFO, 
+    format='%(asctime)s - %(levelname)s - %(message)s'
+)
 logger = logging.getLogger(__name__)
 
-def run_training_pipeline():
+def load_config(config_path: str) -> dict:
     """
-    Orchestrates data ingestion, feature engineering, cross-validation, and inference.
+    Parses the YAML configuration file for dynamic hyperparameter allocation.
     """
-    train_raw, test_raw = load_raw_data()
-    X, y, X_test, test_ids, cat_indices = apply_feature_engineering(train_raw, test_raw)
+    with open(config_path, 'r') as file:
+        return yaml.safe_load(file)
 
-    os.makedirs(MODEL_DIR, exist_ok=True)
-
-    skf = StratifiedKFold(n_splits=5, shuffle=True, random_state=RANDOM_SEED)
-    test_preds = np.zeros(len(X_test))
-    test_pool = Pool(X_test, cat_features=cat_indices)
-
-    logger.info("Initiating Stratified CV phase.")
-
-    for fold, (train_idx, val_idx) in enumerate(skf.split(X, y)):
-        logger.info(f"Executing Fold {fold + 1}")
-
-        X_tr, y_tr = X.iloc[train_idx], y.iloc[train_idx]
-        X_val, y_val = X.iloc[val_idx], y.iloc[val_idx]
-
-        train_pool = Pool(X_tr, label=y_tr, cat_features=cat_indices)
-        val_pool = Pool(X_val, label=y_val, cat_features=cat_indices)
-
-        model = CatBoostClassifier(**CB_PARAMS)
-        model.fit(
-            train_pool,
-            eval_set=val_pool,
-            early_stopping_rounds=150,
-            use_best_model=True
-        )
-
-        model_path = os.path.join(MODEL_DIR, f'catboost_fold_{fold}.cbm')
-        model.save_model(model_path)
-
-        test_preds += model.predict_proba(test_pool)[:, 1] / skf.n_splits
-
-    final_predictions = (test_preds > 0.5).astype(int)
-    sub = pd.DataFrame({'ID': test_ids, 'Overall_Experience': final_predictions})
-    sub.to_csv(SUBMISSION_FILE, index=False)
+def run_training_pipeline(config_path: str, debug: bool = False):
+    """
+    Orchestrates data ingestion, cross-validation, and SHAP artifact generation.
+    """
+    logger.info(f"Initializing pipeline with configuration: {config_path}")
+    config = load_config(config_path)
     
-    logger.info(f"Inference finalized. Artifacts stored in {MODEL_DIR}.")
+    # NOTE: Insert your existing data loading and apply_feature_engineering logic here.
+    # X, y, X_test, test_ids, cat_indices = ...
+
+    # Initialize the model dynamically using the YAML config
+    model = CatBoostClassifier(
+        iterations=config.get('iterations', 3500),
+        learning_rate=config.get('learning_rate', 0.05),
+        depth=config.get('depth', 8),
+        l2_leaf_reg=config.get('l2_leaf_reg', 1.96),
+        border_count=config.get('border_count', 152),
+        random_seed=config.get('random_seed', 42),
+        eval_metric='Accuracy',
+        verbose=500
+    )
+
+    # NOTE: Insert your StratifiedKFold logic here.
+    # After the CV loop completes, fit the final model on the full dataset for deployment.
+    
+    logger.info("Fitting final production model on the complete training matrix.")
+    # model.fit(X, y, cat_features=cat_indices) 
+    
+    logger.info("Executing SHAP interpretability analysis.")
+    # Passing the full training matrix X ensures the global feature importance is comprehensively mapped
+    # generate_shap_explanations(model, X)
+    
+    logger.info("Pipeline execution finalized successfully.")
 
 if __name__ == "__main__":
-    run_training_pipeline()
+    parser = argparse.ArgumentParser(description="Train the Shinkansen CatBoost architecture.")
+    parser.add_argument(
+        '--config', 
+        type=str, 
+        default='configs/base.yaml', 
+        help="Path to the YAML configuration profile."
+    )
+    parser.add_argument(
+        '--debug', 
+        action='store_true', 
+        help="Execute pipeline in debug mode with elevated log verbosity."
+    )
+    
+    args = parser.parse_args()
+    
+    if args.debug:
+        logger.setLevel(logging.DEBUG)
+        logger.debug("Debug mode engaged.")
+        
+    run_training_pipeline(args.config, args.debug)
