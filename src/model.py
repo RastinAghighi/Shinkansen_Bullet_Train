@@ -5,7 +5,7 @@ Implements CatBoost architecture with Stratified K-Fold CV, early stopping, and 
 import logging
 from pathlib import Path
 import pandas as pd
-from catboost import CatBoostClassifier
+from catboost import CatBoostClassifier, Pool
 from sklearn.model_selection import StratifiedKFold
 
 logger = logging.getLogger(__name__)
@@ -39,6 +39,11 @@ def train_cross_validated_model(X: pd.DataFrame, y: pd.Series, cat_features: lis
         X_train, y_train = X.iloc[train_idx], y.iloc[train_idx]
         X_val, y_val = X.iloc[val_idx], y.iloc[val_idx]
         
+        # Centralizing data and categorical metadata via Pool avoids serialization 
+        # mismatches during cross-validation boundary splits.
+        train_pool = Pool(X_train, y_train, cat_features=cat_features)
+        val_pool = Pool(X_val, y_val, cat_features=cat_features)
+        
         model = CatBoostClassifier(
             iterations=config.get('iterations', 3500),
             learning_rate=config.get('learning_rate', 0.05),
@@ -52,9 +57,8 @@ def train_cross_validated_model(X: pd.DataFrame, y: pd.Series, cat_features: lis
         )
         
         model.fit(
-            X_train, y_train,
-            cat_features=cat_features,
-            eval_set=(X_val, y_val),
+            train_pool,
+            eval_set=val_pool,
             use_best_model=True
         )
         
