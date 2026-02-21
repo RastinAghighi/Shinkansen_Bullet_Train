@@ -7,3 +7,7 @@ l2_leaf_reg: 1.96
 border_count: 152
 early_stopping_rounds: 150
 cv_folds: 5
+
+data:
+  train_path: "data/Olympus/Surveydata_train_(1).csv"
+  test_path: "data/Olympus/Surveydata_test_(1).csv"
