@@ -1,0 +1,9 @@
+model: catboost
+random_seed: 42
+iterations: 3500
+learning_rate: 0.05
+depth: 8
+l2_leaf_reg: 1.96
+border_count: 152
+early_stopping_rounds: 150
+cv_folds: 5
