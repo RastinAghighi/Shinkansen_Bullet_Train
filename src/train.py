@@ -7,7 +7,7 @@ import logging
 import yaml
 from src.data import load_data
 from src.model import train_cross_validated_model
-from src.evaluate import generate_shap_explanations
+from src.evaluate import generate_shap_explanations, generate_learning_curves
 
 logging.basicConfig(
     level=logging.INFO, 
@@ -41,6 +41,9 @@ def run_training_pipeline(config_path: str, debug: bool = False):
     
     logger.info("Executing SHAP interpretability analysis.")
     generate_shap_explanations(best_model, X)
+    
+    logger.info("Serializing training telemetry.")
+    generate_learning_curves(best_model)
     
     logger.info("Pipeline execution finalized successfully.")
 
